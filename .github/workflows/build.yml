@@ -28,24 +28,29 @@ jobs:
 
       - run: dart run build_runner build --delete-conflicting-outputs
 
-      - name: Build APK
-        run: flutter build apk --debug
-
-      - name: Find APK
+      - name: Build APK (retry up to 3 times)
         run: |
-          echo "=== Looking for APK ==="
-          find build -name "*.apk" -type f 2>/dev/null
-          echo "=== build/app/outputs contents ==="
-          find build/app/outputs -type f 2>/dev/null || echo "directory not found"
-          APK_PATH=$(find build -name "*.apk" -type f | head -1)
-          echo "APK_PATH=$APK_PATH" >> $GITHUB_ENV
-          echo "Found APK: $APK_PATH"
+          for i in 1 2 3; do
+            echo "=== Attempt $i ==="
+            flutter build apk --debug && break
+            echo "Attempt $i failed, retrying..."
+            rm -rf build/
+            sleep 10
+          done
 
-      - name: Create Release
-        if: env.APK_PATH != ''
+      - name: Find and Release APK
+        if: success()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          APK_PATH=$(find build -name "*.apk" -type f 2>/dev/null | head -1)
+          if [ -z "$APK_PATH" ]; then
+            echo "No APK found!"
+            echo "Build output:"
+            find build/app/outputs -type f 2>/dev/null
+            exit 1
+          fi
+          echo "Found APK: $APK_PATH"
           gh release delete v1.0.0 --yes --cleanup-tag 2>/dev/null || true
           gh release create v1.0.0 "$APK_PATH" \
             --title "Free Translator APK" \
