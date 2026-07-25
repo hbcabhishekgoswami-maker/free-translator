@@ -29,33 +29,47 @@ jobs:
       - run: dart run build_runner build --delete-conflicting-outputs
 
       - name: Build APK
-        run: flutter build apk --debug
-
-      - name: Debug build output
-        if: always()
         run: |
-          echo "## Build directory listing" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          find build -type f -name "*.apk" 2>/dev/null >> $GITHUB_STEP_SUMMARY || echo "No APK files found" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "build/app/outputs contents:" >> $GITHUB_STEP_SUMMARY
-          find build/app/outputs -type f 2>/dev/null >> $GITHUB_STEP_SUMMARY || echo "directory missing" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
+          for i in 1 2 3; do
+            echo "=== Attempt $i ==="
+            flutter build apk --debug && break || true
+            sleep 5
+          done
 
-      - name: Create Release
-        if: success()
+      - name: Find APK and Create Release
+        if: always()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          APK=$(find build -name "*.apk" -type f 2>/dev/null | head -1)
-          echo "APK found: $APK"
+          echo "=== Searching for APK files ==="
+          find / -name "*.apk" -type f 2>/dev/null | grep -v ".gradle" | head -20
+          echo "=== Build dir ==="
+          ls -laR build/app/outputs/ 2>/dev/null || echo "no build/app/outputs"
+          echo "=== Home build dir ==="
+          ls -laR ~/build/ 2>/dev/null || echo "no ~/build"
+          echo "=== Flutter build output ==="
+          ls -laR .dart_tool/ 2>/dev/null | head -5
+
+          APK=$(find / -name "app-debug.apk" -type f 2>/dev/null | head -1)
+          if [ -z "$APK" ]; then
+            APK=$(find build -name "*.apk" -type f 2>/dev/null | head -1)
+          fi
+          if [ -z "$APK" ]; then
+            APK=$(find /home -name "*.apk" -type f 2>/dev/null | head -1)
+          fi
+          if [ -z "$APK" ]; then
+            APK=$(find /tmp -name "*.apk" -type f 2>/dev/null | head -1)
+          fi
+
+          echo "FINAL APK: $APK"
           if [ -n "$APK" ]; then
             gh release delete v1.0.0 --yes --cleanup-tag 2>/dev/null || true
             gh release create v1.0.0 "$APK" \
               --title "Free Translator APK" \
               --notes "Free Translator - Offline ML Kit Translation App" \
               --prerelease
+            echo "RELEASE CREATED!"
           else
-            echo "NO APK FOUND"
+            echo "NO APK FOUND ANYWHERE"
             exit 1
           fi
