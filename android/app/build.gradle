@@ -7,7 +7,7 @@ plugins {
 
 android {
     namespace = "com.hitranslate.hi_translate"
-    compileSdk = 34
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
