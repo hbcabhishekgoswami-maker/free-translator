@@ -30,11 +30,31 @@ jobs:
       - name: Run build_runner
         run: dart run build_runner build --delete-conflicting-outputs
 
+      - name: Analyze
+        run: flutter analyze 2>&1 | tail -50 > analyze-output.txt || true
+
       - name: Build APK
-        run: flutter build apk --debug
+        run: flutter build apk --debug 2>&1 | tail -200 > build-output.txt; echo "EXIT: $?" > build-exit.txt; cat build-exit.txt
+
+      - name: Save error log to repo
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          echo "=== Analyze Output ===" > error-log.txt
+          cat analyze-output.txt >> error-log.txt 2>/dev/null || echo "no analyze" >> error-log.txt
+          echo "" >> error-log.txt
+          echo "=== Build Exit ===" >> error-log.txt
+          cat build-exit.txt >> error-log.txt 2>/dev/null || echo "no exit" >> error-log.txt
+          echo "" >> error-log.txt
+          echo "=== Build Output (last 200 lines) ===" >> error-log.txt
+          cat build-output.txt >> error-log.txt 2>/dev/null || echo "no build output" >> error-log.txt
+          git add error-log.txt
+          git diff --cached --quiet || git commit -m "Update error log [skip ci]" && git push || true
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
+        if: success()
         with:
           name: Free-Translator-APK
           path: build/app/outputs/flutter-apk/app-debug.apk
