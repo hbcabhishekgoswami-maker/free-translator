@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 jobs:
   build:
@@ -31,11 +32,20 @@ jobs:
       - name: Build APK
         run: flutter build apk --debug
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
         with:
-          tag_name: v1.0.0
-          name: Free Translator APK
-          body: "Free Translator - Offline ML Kit Translation App"
-          files: build/app/outputs/flutter-apk/app-debug.apk
-          prerelease: true
+          name: Free-Translator-APK
+          path: build/app/outputs/flutter-apk/app-debug.apk
+          retention-days: 30
+
+      - name: Create Release
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release delete v1.0.0 --yes --cleanup-tag 2>/dev/null || true
+          gh release create v1.0.0 build/app/outputs/flutter-apk/app-debug.apk \
+            --title "Free Translator APK" \
+            --notes "Free Translator - Offline ML Kit Translation App. Download and install on your Android phone." \
+            --prerelease
