@@ -7,7 +7,6 @@ on:
 
 permissions:
   contents: write
-  actions: write
 
 jobs:
   build:
@@ -32,20 +31,23 @@ jobs:
       - name: Build APK
         run: flutter build apk --debug
 
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: Free-Translator-APK
-          path: build/app/outputs/flutter-apk/app-debug.apk
-          retention-days: 30
+      - name: Find APK
+        run: |
+          echo "=== Looking for APK ==="
+          find build -name "*.apk" -type f 2>/dev/null
+          echo "=== build/app/outputs contents ==="
+          find build/app/outputs -type f 2>/dev/null || echo "directory not found"
+          APK_PATH=$(find build -name "*.apk" -type f | head -1)
+          echo "APK_PATH=$APK_PATH" >> $GITHUB_ENV
+          echo "Found APK: $APK_PATH"
 
       - name: Create Release
-        if: success()
+        if: env.APK_PATH != ''
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release delete v1.0.0 --yes --cleanup-tag 2>/dev/null || true
-          gh release create v1.0.0 build/app/outputs/flutter-apk/app-debug.apk \
+          gh release create v1.0.0 "$APK_PATH" \
             --title "Free Translator APK" \
             --notes "Free Translator - Offline ML Kit Translation App. Download and install on your Android phone." \
             --prerelease
