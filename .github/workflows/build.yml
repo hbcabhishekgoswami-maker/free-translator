@@ -3,6 +3,7 @@ name: Build Flutter APK
 on:
   push:
     branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   build:
@@ -30,44 +31,11 @@ jobs:
         run: dart run build_runner build --delete-conflicting-outputs
 
       - name: Build APK
-        id: build
-        run: |
-          flutter build apk --debug > build-output.txt 2>&1
-          EXIT_CODE=$?
-          echo "exit_code=$EXIT_CODE" >> "$GITHUB_OUTPUT"
-          if [ $EXIT_CODE -ne 0 ]; then
-            echo "### Build FAILED ❌" >> "$GITHUB_STEP_SUMMARY"
-            echo '```' >> "$GITHUB_STEP_SUMMARY"
-            tail -100 build-output.txt >> "$GITHUB_STEP_SUMMARY"
-            echo '```' >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "### Build SUCCEEDED ✅" >> "$GITHUB_STEP_SUMMARY"
-          fi
-          exit $EXIT_CODE
+        run: flutter build apk --debug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
-        if: steps.build.outputs.exit_code == '0'
         with:
           name: Free-Translator-APK
           path: build/app/outputs/flutter-apk/app-debug.apk
-          retention-days: 7
-
-      - name: Upload build log
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: build-output
-          path: build-output.txt
-          retention-days: 7
-
-      - name: Commit build log to repo
-        if: always()
-        run: |
-          if [ -f build-output.txt ]; then
-            cp build-output.txt build-log.txt
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add build-log.txt
-            git diff --cached --quiet || git commit -m "Update build log" && git push || true
-          fi
+          retention-days: 30
