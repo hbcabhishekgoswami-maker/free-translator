@@ -23,18 +23,30 @@ jobs:
           flutter-version: '3.27.4'
           channel: 'stable'
 
+      - name: Flutter doctor
+        run: flutter doctor -v 2>&1 | tee flutter-doctor.log
+
       - name: Get dependencies
-        run: flutter pub get
+        run: flutter pub get 2>&1 | tee pub-get.log
 
       - name: Run build_runner
-        run: dart run build_runner build --delete-conflicting-outputs
+        run: dart run build_runner build --delete-conflicting-outputs 2>&1 | tee build-runner.log
+
+      - name: Analyze code
+        run: flutter analyze 2>&1 | tee analyze.log || true
 
       - name: Build APK
-        run: flutter build apk --debug
+        run: flutter build apk --debug 2>&1 | tee build-apk.log || true
 
-      - name: Upload APK
+      - name: Upload logs
         uses: actions/upload-artifact@v4
+        if: always()
         with:
-          name: Free-Translator-APK
-          path: build/app/outputs/flutter-apk/app-debug.apk
+          name: build-logs
+          path: |
+            flutter-doctor.log
+            pub-get.log
+            build-runner.log
+            analyze.log
+            build-apk.log
           retention-days: 7
