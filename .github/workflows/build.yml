@@ -9,6 +9,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
+      contents: write
       issues: write
     steps:
       - uses: actions/checkout@v4
@@ -28,29 +29,10 @@ jobs:
       - run: dart run build_runner build --delete-conflicting-outputs
 
       - name: Build APK
-        id: buildapk
-        continue-on-error: true
-        run: flutter build apk --debug 2>&1 | tee /tmp/build.log
-
-      - name: Post error to issue
-        if: steps.buildapk.outcome == 'failure'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            let log = '';
-            try { log = fs.readFileSync('/tmp/build.log', 'utf8'); } catch(e) { log = 'no log file'; }
-            const tail = log.split('\n').slice(-150).join('\n');
-            await github.rest.issues.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title: 'Build Error Log',
-              body: '```\n' + tail + '\n```'
-            });
+        run: flutter build apk --debug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
-        if: steps.buildapk.outcome == 'success'
         with:
           name: Free-Translator-APK
           path: build/app/outputs/flutter-apk/app-debug.apk
