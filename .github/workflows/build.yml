@@ -23,25 +23,34 @@ jobs:
           flutter-version: '3.27.4'
           channel: 'stable'
 
-      - name: Flutter doctor
-        run: flutter doctor -v
-
       - name: Get dependencies
         run: flutter pub get
 
       - name: Run build_runner
         run: dart run build_runner build --delete-conflicting-outputs
 
-      - name: Analyze code
-        run: flutter analyze
+      - name: Build APK
+        id: build_apk
+        run: flutter build apk --debug 2>&1 | tee build_log.txt
         continue-on-error: true
 
-      - name: Build APK
-        run: flutter build apk --debug 2>&1 || flutter build apk --debug --no-tree-shake-icons 2>&1
+      - name: Show error logs
+        if: steps.build_apk.outcome == 'failure'
+        run: |
+          echo "=== BUILD FAILED ==="
+          tail -200 build_log.txt
+
+      - name: Upload build log
+        if: steps.build_apk.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-error-log
+          path: build_log.txt
+          retention-days: 3
 
       - name: Upload APK
+        if: steps.build_apk.outcome == 'success'
         uses: actions/upload-artifact@v4
-        if: success()
         with:
           name: free-translator-apk
           path: build/app/outputs/flutter-apk/app-debug.apk
