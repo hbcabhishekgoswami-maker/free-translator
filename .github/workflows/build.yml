@@ -25,51 +25,119 @@ jobs:
           channel: stable
 
       - run: flutter pub get
-
       - run: dart run build_runner build --delete-conflicting-outputs
 
-      - name: Build APK
+      - name: Build APK (verbose)
+        id: build
         run: |
-          for i in 1 2 3; do
-            echo "=== Attempt $i ==="
-            flutter build apk --debug && break || true
-            sleep 5
+          echo "### Flutter Version" >> $GITHUB_STEP_SUMMARY
+          flutter --version >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Disk Space" >> $GITHUB_STEP_SUMMARY
+          df -h / >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          flutter build apk --debug --verbose 2>&1 | tee /tmp/build.log || true
+
+          echo "### Build Output (last 100 lines)" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          tail -100 /tmp/build.log >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+          # Check for common errors
+          if grep -q "BUILD FAILED" /tmp/build.log; then
+            echo "❌ BUILD FAILED - checking errors..." >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            grep -i "error\|FAILED\|exception" /tmp/build.log | head -30 >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          elif grep -q "BUILD SUCCESSFUL" /tmp/build.log; then
+            echo "✅ BUILD SUCCESSFUL" >> $GITHUB_STEP_SUMMARY
+          elif grep -q "flutter build apk" /tmp/build.log; then
+            echo "Build command ran" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### APK Search - ALL possible paths" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+          # Check every possible Flutter APK output path
+          for path in \
+            "build/app/outputs/flutter-apk/app-debug.apk" \
+            "build/app/outputs/flutter/apk/app-debug.apk" \
+            "build/app/outputs/flutter/app-debug.apk" \
+            "build/app/outputs/apk/debug/app-debug.apk" \
+            "build/app/outputs/bundle/debug/app-debug.apk" \
+            "android/app/build/outputs/flutter-apk/app-debug.apk" \
+            "android/app/build/outputs/apk/debug/app-debug.apk" \
+            "build/app/outputs" \
+            "build/app" \
+            "build"; do
+            if [ -e "$path" ]; then
+              echo "EXISTS: $path" >> $GITHUB_STEP_SUMMARY
+              if [ -d "$path" ]; then
+                ls -la "$path" >> $GITHUB_STEP_SUMMARY 2>&1
+              fi
+            fi
           done
 
-      - name: Find APK and Create Release
-        if: always()
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "=== find build -name '*.apk' ===" >> $GITHUB_STEP_SUMMARY
+          find build -name "*.apk" -type f 2>> /dev/null >> $GITHUB_STEP_SUMMARY || echo "no build dir" >> $GITHUB_STEP_SUMMARY
+          echo "=== find build -name '*.aab' ===" >> $GITHUB_STEP_SUMMARY
+          find build -name "*.aab" -type f 2>> /dev/null >> $GITHUB_STEP_SUMMARY || true
+          echo "=== find build -name '*.apks' ===" >> $GITHUB_STEP_SUMMARY
+          find build -name "*.apks" -type f 2>> /dev/null >> $GITHUB_STEP_SUMMARY || true
+          echo "=== find android/app/build -name '*.apk' ===" >> $GITHUB_STEP_SUMMARY
+          find android/app/build -name "*.apk" -type f 2>> /dev/null >> $GITHUB_STEP_SUMMARY || echo "no android/app/build" >> $GITHUB_STEP_SUMMARY
+          echo "=== ls -laR build/app/outputs ===" >> $GITHUB_STEP_SUMMARY
+          ls -laR build/app/outputs/ 2>> /dev/null >> $GITHUB_STEP_SUMMARY || echo "no build/app/outputs" >> $GITHUB_STEP_SUMMARY
+          echo "=== find / -name '*.apk' (excl .gradle) ===" >> $GITHUB_STEP_SUMMARY
+          find / -name "*.apk" -type f 2>/dev/null | grep -v ".gradle" | head -20 >> $GITHUB_STEP_SUMMARY || true
+
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Find and Release APK
+        if: success()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "=== Searching for APK files ==="
-          find / -name "*.apk" -type f 2>/dev/null | grep -v ".gradle" | head -20
-          echo "=== Build dir ==="
-          ls -laR build/app/outputs/ 2>/dev/null || echo "no build/app/outputs"
-          echo "=== Home build dir ==="
-          ls -laR ~/build/ 2>/dev/null || echo "no ~/build"
-          echo "=== Flutter build output ==="
-          ls -laR .dart_tool/ 2>/dev/null | head -5
+          # Try every possible path
+          APK=""
+          for path in \
+            "build/app/outputs/flutter-apk/app-debug.apk" \
+            "build/app/outputs/flutter/apk/app-debug.apk" \
+            "build/app/outputs/flutter/app-debug.apk" \
+            "build/app/outputs/apk/debug/app-debug.apk" \
+            "android/app/build/outputs/apk/debug/app-debug.apk"; do
+            if [ -f "$path" ]; then
+              APK="$path"
+              echo "Found APK at: $APK"
+              break
+            fi
+          done
 
-          APK=$(find / -name "app-debug.apk" -type f 2>/dev/null | head -1)
           if [ -z "$APK" ]; then
-            APK=$(find build -name "*.apk" -type f 2>/dev/null | head -1)
+            APK=$(find build android/app/build -name "*.apk" -type f 2>/dev/null | head -1)
           fi
           if [ -z "$APK" ]; then
-            APK=$(find /home -name "*.apk" -type f 2>/dev/null | head -1)
-          fi
-          if [ -z "$APK" ]; then
-            APK=$(find /tmp -name "*.apk" -type f 2>/dev/null | head -1)
+            APK=$(find / -name "*.apk" -type f 2>/dev/null | grep -v ".gradle" | head -1)
           fi
 
-          echo "FINAL APK: $APK"
           if [ -n "$APK" ]; then
+            echo "### APK Found!" >> $GITHUB_STEP_SUMMARY
+            echo "Path: $APK" >> $GITHUB_STEP_SUMMARY
+            echo "Size: $(ls -lh "$APK" | awk '{print $5}')" >> $GITHUB_STEP_SUMMARY
+
+            cp "$APK" /tmp/free-translator.apk
             gh release delete v1.0.0 --yes --cleanup-tag 2>/dev/null || true
-            gh release create v1.0.0 "$APK" \
+            gh release create v1.0.0 /tmp/free-translator.apk \
               --title "Free Translator APK" \
-              --notes "Free Translator - Offline ML Kit Translation App" \
+              --notes "Free Translator - Offline ML Kit Translation App. Download and install on your Android phone." \
               --prerelease
-            echo "RELEASE CREATED!"
+            echo "### Release Created!" >> $GITHUB_STEP_SUMMARY
+            echo "Download: https://github.com/hbcabhishekgoswami-maker/free-translator/releases/download/v1.0.0/free-translator.apk" >> $GITHUB_STEP_SUMMARY
           else
-            echo "NO APK FOUND ANYWHERE"
+            echo "### NO APK FOUND" >> $GITHUB_STEP_SUMMARY
+            echo "Build completed but APK was not generated. Check build logs above." >> $GITHUB_STEP_SUMMARY
             exit 1
           fi
