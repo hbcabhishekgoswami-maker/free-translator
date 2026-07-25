@@ -5,6 +5,9 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -26,21 +29,13 @@ jobs:
       - run: dart run build_runner build --delete-conflicting-outputs
 
       - name: Build APK
-        id: build
-        run: flutter build apk --debug 2>&1 | tee /tmp/build_output.txt
+        run: flutter build apk --debug
 
-      - name: Show build output on failure
-        if: failure()
-        run: |
-          echo "## Build Output (last 500 lines)" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          tail -500 /tmp/build_output.txt >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        if: success()
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
         with:
-          name: Free-Translator-APK
-          path: build/app/outputs/flutter-apk/app-debug.apk
-          retention-days: 30
+          tag_name: v1.0.0
+          name: Free Translator APK
+          body: "Free Translator - Offline ML Kit Translation App"
+          files: build/app/outputs/flutter-apk/app-debug.apk
+          prerelease: true
