@@ -1,4 +1,4 @@
-name: Build Flutter APK
+name: Build APK
 
 on:
   push:
@@ -8,53 +8,26 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Java
-        uses: actions/setup-java@v4
+      - uses: actions/setup-java@v4
         with:
-          distribution: 'zulu'
-          java-version: '17'
+          distribution: zulu
+          java-version: 17
 
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.27.4'
-          channel: 'stable'
+          flutter-version: 3.27.4
+          channel: stable
 
-      - name: Get dependencies
-        run: flutter pub get
+      - run: flutter pub get
 
-      - name: Run build_runner
-        run: dart run build_runner build --delete-conflicting-outputs
+      - run: dart run build_runner build --delete-conflicting-outputs
 
-      - name: Analyze
-        run: flutter analyze 2>&1 | tail -50 > analyze-output.txt || true
+      - run: flutter build apk --debug
 
-      - name: Build APK
-        run: flutter build apk --debug 2>&1 | tail -200 > build-output.txt; echo "EXIT: $?" > build-exit.txt; cat build-exit.txt
-
-      - name: Save error log to repo
-        if: always()
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          echo "=== Analyze Output ===" > error-log.txt
-          cat analyze-output.txt >> error-log.txt 2>/dev/null || echo "no analyze" >> error-log.txt
-          echo "" >> error-log.txt
-          echo "=== Build Exit ===" >> error-log.txt
-          cat build-exit.txt >> error-log.txt 2>/dev/null || echo "no exit" >> error-log.txt
-          echo "" >> error-log.txt
-          echo "=== Build Output (last 200 lines) ===" >> error-log.txt
-          cat build-output.txt >> error-log.txt 2>/dev/null || echo "no build output" >> error-log.txt
-          git add error-log.txt
-          git diff --cached --quiet || git commit -m "Update error log [skip ci]" && git push || true
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        if: success()
+      - uses: actions/upload-artifact@v4
         with:
           name: Free-Translator-APK
           path: build/app/outputs/flutter-apk/app-debug.apk
