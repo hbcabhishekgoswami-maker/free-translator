@@ -93,9 +93,6 @@ class OverlayService : Service() {
         val closeBtn = ImageView(this).apply {
             setImageResource(android.R.drawable.ic_menu_close_clear_cancel)
             setColorFilter(Color.parseColor("#E94560"))
-            val params = LinearLayout.LayoutParams(48, 48)
-            params.gravity = Gravity.END
-            layoutParams = params
             setOnClickListener {
                 removeOverlay()
                 stopSelf()
@@ -104,7 +101,10 @@ class OverlayService : Service() {
 
         container.addView(originalText)
         container.addView(translatedText)
-        container.addView(closeBtn)
+
+        val closeBtnParams = LinearLayout.LayoutParams(48, 48)
+        closeBtnParams.gravity = Gravity.END
+        container.addView(closeBtn, closeBtnParams)
 
         overlayView = container
 
@@ -177,7 +177,7 @@ class OverlayService : Service() {
             Notification.Builder(this, CHANNEL_ID)
                 .setContentTitle("Free Translator")
                 .setContentText("Floating translator is active")
-                .setSmallIcon(android.R.drawable.ic_menu_translate)
+                .setSmallIcon(android.R.drawable.ic_menu_send)
                 .setContentIntent(pendingIntent)
                 .setOngoing(true)
                 .build()
@@ -186,7 +186,7 @@ class OverlayService : Service() {
             Notification.Builder(this)
                 .setContentTitle("Free Translator")
                 .setContentText("Floating translator is active")
-                .setSmallIcon(android.R.drawable.ic_menu_translate)
+                .setSmallIcon(android.R.drawable.ic_menu_send)
                 .setContentIntent(pendingIntent)
                 .setOngoing(true)
                 .build()
