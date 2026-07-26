@@ -30,7 +30,7 @@ jobs:
         run: |
           flutter pub get
           dart run build_runner build --delete-conflicting-outputs
-          flutter build apk --debug
+          flutter build apk --release
 
       - name: Find and Release
         if: success()

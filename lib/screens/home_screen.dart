@@ -212,7 +212,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 28),
+            const SizedBox(height: 20),
 
             Container(
               padding: const EdgeInsets.all(16),
@@ -384,7 +384,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
             ),
-            const SizedBox(height: 28),
+            const SizedBox(height: 20),
 
             const Text(
               'Translation Tools',
